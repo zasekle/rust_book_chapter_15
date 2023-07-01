@@ -1,3 +1,4 @@
+use std::ops::Deref;
 
 fn main() {
     //In Rust, they have smart pointers that offer additional functionality compared to the standard
@@ -47,7 +48,7 @@ fn using_box_to_point_to_data_on_the_heap() {
     #[derive(Debug)]
     enum HelloEnum {
         Hello(Box<HelloEnum>),
-        Null
+        Null,
     }
 
     let my_hello = HelloEnum::Hello(
@@ -60,5 +61,53 @@ fn using_box_to_point_to_data_on_the_heap() {
 }
 
 fn treating_smart_pointers_like_regular_references_with_deref_trait() {
+    //The Deref trait allows something similar to overloading the dereference operator `*`. This
+    // allows a smart pointer to be treated like a regular reference. The Box<T> struct is an
+    // example of something that implements Deref. This allows for the below code to compile and
+    // display `y: 5`.
+    let x = 5;
+    let y = Box::new(x);
 
+    println!("x: {} y: {}", x, *y);
+
+    struct CustomBox<T>(T);
+
+    impl<T> CustomBox<T> {
+        fn new(x: T) -> CustomBox<T> {
+            CustomBox(x)
+        }
+    }
+
+    //This is how to implement the Deref trait and make a custom smart pointer.
+    impl<T> Deref for CustomBox<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    let custom_box = CustomBox::new(5);
+
+    //The `*` operator seems to be syntactic sugar for calling *(custom_box.deref()). The reason
+    // that it calls a .deref() first is because the Deref trait itself returns a reference. So
+    // it calls .deref() which returns the reference, then calls the `*` operator which dereferences
+    // that returned reference.
+    println!("*custom_box: {} *(custom_box.deref()): {}", *custom_box, *(custom_box.deref()));
+
+    fn hello_world(str: &str) {
+        println!("str: {str}");
+    }
+
+    //Deref coercion is a thing in Rust. This means that it changes the type automatically depending
+    // on the situation. The most straightforward situation is when de-referencing String into &str.
+    // Technically &String should be the type returned. However, there is an implementation of Deref
+    // on String that returns the string slice instead.
+    hello_world(&String::from("My_string"));
+
+    //It is also worth noting that Rust will run Deref::deref as many times as it has to to get
+    // a reference to match the parameter's type. This is all resolved at compile time as well
+    // meaning there is no performance penalty for using deref coercion.
+
+    //In order to override `*` operator on mutable references, the DerefMut trait must be used.
 }

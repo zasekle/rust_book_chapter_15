@@ -6,6 +6,7 @@ fn main() {
     // examples of smart pointers.
     using_box_to_point_to_data_on_the_heap();
     treating_smart_pointers_like_regular_references_with_deref_trait();
+    running_code_on_cleanup_with_the_drop_trait();
 }
 
 fn using_box_to_point_to_data_on_the_heap() {
@@ -110,4 +111,50 @@ fn treating_smart_pointers_like_regular_references_with_deref_trait() {
     // meaning there is no performance penalty for using deref coercion.
 
     //In order to override `*` operator on mutable references, the DerefMut trait must be used.
+}
+
+fn running_code_on_cleanup_with_the_drop_trait() {
+    //Drop lets me customize what happens when a value is about to go out of scope. This seems to be
+    // similar to a deconstructor in c++. Just like in c++, this is often used to deallocate memory
+    // for the object.
+
+    #[derive(Debug)]
+    struct Square {
+        side: isize,
+    }
+
+    impl Drop for Square {
+        fn drop(&mut self) {
+            println!("Square {:?} dropped", self);
+        }
+    }
+
+    println!("Before scope");
+    {
+        //Note that the objects are deallocated in the reverse order they are allocated in. I
+        // assume that this is because they are popped from the stack as they are removed.
+        let square_one = Square {
+            side: 5,
+        };
+
+        let square_two = Square {
+            side: 1,
+        };
+
+        println!("squares created {:?} {:?}", square_one, square_two);
+    }
+    println!("After scope");
+
+    let square_three = Square {
+        side: 2,
+    };
+
+    //The drop function cannot be manually called here. Instead Rust provides a function called
+    // std::mem::drop that can be used to drop.
+    // square_three.drop() //Invalid, will cause a compiler error.
+
+    println!("Before square_three dropped");
+    drop(square_three);
+    println!("After square_three dropped");
+
 }

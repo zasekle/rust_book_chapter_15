@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::ops::Deref;
+use std::rc::Rc;
 
 fn main() {
     //In Rust, they have smart pointers that offer additional functionality compared to the standard
@@ -7,6 +9,7 @@ fn main() {
     using_box_to_point_to_data_on_the_heap();
     treating_smart_pointers_like_regular_references_with_deref_trait();
     running_code_on_cleanup_with_the_drop_trait();
+    rc_the_reference_counted_smart_pointer();
 }
 
 fn using_box_to_point_to_data_on_the_heap() {
@@ -156,5 +159,33 @@ fn running_code_on_cleanup_with_the_drop_trait() {
     println!("Before square_three dropped");
     drop(square_three);
     println!("After square_three dropped");
+}
 
+fn rc_the_reference_counted_smart_pointer() {
+    //Rc<T> is a reference counted object, so it can have multiple owners. Similar to shared_ptr in
+    // c++.
+
+    //Because of the borrow checker in Rust, the Rc<T> object is very useful (although lifetimes
+    // are better if possible). As an example the below code will not compile because the String `a`
+    // has already been moves. However, if an Rc<T> is used, then it can be set up to work.
+    // let a = String::from("String value");
+    // let b = a;
+    // let c = a;
+
+    let mut a = Rc::new(String::from("String value"));
+    //Note that Rc::clone is used instead of a.clone(). This is a convention in Rust to be explicit
+    // that it is an Rc<T> object that is being cloned. This is important because clone on Rc<T>
+    // does not work the same was it does for most objects. For most object it makes a deep copy of
+    // the object, for Rc<T> it increases the reference count instead.
+    let b = Rc::clone(&a);
+    let c = Rc::clone(&a);
+
+    println!("a: {} b: {} c: {}", a, b, c);
+
+    //The reference count can be checked with Rc::strong_count. Rc::weak_count has something to do
+    // with creating a weak ptr, but that isn't covered yet.
+    println!("ref count: {}", Rc::strong_count(&a));
+
+    //A problem with Rc<T> is that all references are immutable. The next section will help when
+    // dealing with this issue.
 }

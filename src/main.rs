@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -10,6 +11,7 @@ fn main() {
     treating_smart_pointers_like_regular_references_with_deref_trait();
     running_code_on_cleanup_with_the_drop_trait();
     rc_the_reference_counted_smart_pointer();
+    refcell_and_the_interior_mutability_pattern();
 }
 
 fn using_box_to_point_to_data_on_the_heap() {
@@ -188,4 +190,66 @@ fn rc_the_reference_counted_smart_pointer() {
 
     //A problem with Rc<T> is that all references are immutable. The next section will help when
     // dealing with this issue.
+}
+
+fn refcell_and_the_interior_mutability_pattern() {
+
+    //The RefCell<T> allows for mutable elements to be used from an Rc<T> object, even when other
+    // immutable references are available. This breaks the rules of the Rust borrow checker and so
+    // the RefCell<T> must rely on unsafe code. Note that this does not mean that it is allowed to
+    // have mutable references outstanding with other references. It simply means the check is
+    // moved to a runtime check instead of a compile time check. So there will not be a compile time
+    // error, instead it will panic and exit if the rules are broken.
+    //An interesting note here is that just like Rc<T>, RefCell<T> is not for use in multithreaded
+    // contexts. Apparently there is another value that is used for that and will be discussed
+    // later. I think this is interesting because my first impression was that multithreaded
+    // contexts would be the primary use case.
+
+    //The example they give online is the ability to create Mock objects as a possible use case.
+    // Instead I will do something that is actually a poor practice to get an example of its use.
+
+    struct Hello {
+        string: RefCell<String>
+    }
+
+    trait World {
+        fn print(&self);
+    }
+
+    impl World for Hello {
+        fn print(&self) {
+            //Note that on this line, the value is changed even though it is passed as an immutable
+            // reference.
+            self.string.borrow_mut().push('b');
+            println!("string: {}", self.string.borrow());
+        }
+    }
+
+    let hello = Hello {
+        string: RefCell::new(String::from("a"))
+    };
+
+    hello.print();
+
+    //RefCell<T> can also work well with Rc<T>. This is because Rc<T> only stores immutable values
+    // and RefCell<T> allows for mutability. So an item can be stored in multiple places with Rc<T>
+    // and modified with RefCell<T>.
+    let my_item = Rc::new(RefCell::new(String::from("Hello world")));
+
+    let ref_two = Rc::clone(&my_item);
+    let ref_three = Rc::clone(&my_item);
+
+    println!("No changes: {}", my_item.borrow());
+
+    ref_two.borrow_mut().pop();
+    println!("popped: {}", my_item.borrow());
+
+    ref_three.borrow_mut().pop();
+    println!("popped: {}", my_item.borrow());
+
+    //Note that the below code will crash during runtime, but not during compile time. This is
+    // because as stated above, only a single mutable reference can be outstanding at a time.
+    // let first_one = ref_two.borrow_mut();
+    // let crash = ref_three.borrow_mut();
+
 }

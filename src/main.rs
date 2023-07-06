@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 fn main() {
     //In Rust, they have smart pointers that offer additional functionality compared to the standard
@@ -12,6 +12,7 @@ fn main() {
     running_code_on_cleanup_with_the_drop_trait();
     rc_the_reference_counted_smart_pointer();
     refcell_and_the_interior_mutability_pattern();
+    reference_cycles_can_leak_memory();
 }
 
 fn using_box_to_point_to_data_on_the_heap() {
@@ -209,7 +210,7 @@ fn refcell_and_the_interior_mutability_pattern() {
     // Instead I will do something that is actually a poor practice to get an example of its use.
 
     struct Hello {
-        string: RefCell<String>
+        string: RefCell<String>,
     }
 
     trait World {
@@ -251,5 +252,59 @@ fn refcell_and_the_interior_mutability_pattern() {
     // because as stated above, only a single mutable reference can be outstanding at a time.
     // let first_one = ref_two.borrow_mut();
     // let crash = ref_three.borrow_mut();
+}
+
+fn reference_cycles_can_leak_memory() {
+    //Rust does not actually guarantee no memory leaks. For example Rc<T> can have items that
+    // reference each other and so are never cleaned up. This is actually interesting because from
+    // a simplistic view I assumed the borrow checker would take care of memory leaks completely.
+    // But it seems to be more of a soft guarantee where leaks are hard but not impossible.
+
+    #[derive(Debug)]
+    struct MemLeak {
+        hello: Option<Rc<RefCell<MemLeak>>>,
+    }
+
+    let first = Rc::new(
+        RefCell::new(
+            MemLeak {
+                hello: None
+            }
+        )
+    );
+
+    let second = Rc::new(
+        RefCell::new(
+            MemLeak {
+                hello: Some(Rc::clone(&first))
+            }
+        )
+    );
+
+    //First now stores second and second stores first. This is a memory leak.
+    first.borrow_mut().hello.replace(Rc::clone(&second));
+
+    //This statement will cause a stack overflow and crash because it is an endless loop of printing
+    // internals.
+    // println!("first: {:?}", first);
+
+    //If Rc<T> is a shared_ptr in c++, then Weak<T> is a weak_ptr. A weak pointer can be extracted
+    // from Rc<T> by calling Rc::downgrade. This pointer will not have any effect on whether the
+    // value is cleaned up because it does not have an effect on strong_count. Instead it has an
+    // effect on weak_count. Note that a weak pointer is a good way to avoid the reference cycles
+    // previously discussed. Also note that when upgrading a Weak<T> object, an Rc<T> object is
+    // returned and a strong reference now exists.
+
+    let mut weak_fails: Weak<i32>;
+    {
+        let pointer = Rc::new(5);
+        let weak_exists = Rc::downgrade(&pointer);
+        weak_fails = Rc::downgrade(&pointer);
+
+        //The weak pointer exists because the Rc variable still exists.
+        println!("weak_exists: {:?}", weak_exists.upgrade());
+    }
+    //The weak pointer no longer exists because the reference counter was cleaned up.
+    println!("weak_fails: {:?}", weak_fails.upgrade());
 
 }
